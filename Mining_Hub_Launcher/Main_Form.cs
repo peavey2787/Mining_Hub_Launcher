@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
 using RadioButton = System.Windows.Forms.RadioButton;
@@ -19,19 +20,23 @@ namespace Mining_Hub_Launcher
         public Main_Form()
         {
             InitializeComponent();
-            Server_File = File_Exists("Mining_Hub_Server.exe");
-            Viewer_File = File_Exists("Mining_Hub_Viewer.exe");
 
-            bool ready = false;
-            int retries = 5;
-            do
+            Task.Run(() =>
             {
-                ready = Ensure_App_Files_Exist();
-                retries--;
-                Thread.Sleep(100);
-            }while (!ready && retries > 0);
+                Server_File = File_Exists("Mining_Hub_Server.exe");
+                Viewer_File = File_Exists("Mining_Hub_Viewer.exe");
 
-            if (!ready) MessageBox.Show("Unable to get app files, please try again");
+                bool ready = false;
+                int retries = 5;
+                do
+                {
+                    ready = Ensure_App_Files_Exist();
+                    retries--;
+                    Thread.Sleep(100);
+                } while (!ready && retries > 0);
+
+                if (!ready) MessageBox.Show("Unable to get app files, please try again");
+            });
         }
 
         void Main_Form_Load(object sender, EventArgs e)
