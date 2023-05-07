@@ -6,16 +6,21 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Timers;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
 using RadioButton = System.Windows.Forms.RadioButton;
+using Timer = System.Windows.Forms.Timer;
 
 namespace Mining_Hub_Launcher
 {
     public partial class Main_Form : Form
     {
-        string Server_File { get; set; }
-        string Viewer_File { get; set; }        
+        string Server_File_Name { get; set; }
+        string Server_File_Path { get; set; }
+        string Viewer_File_Name { get; set; }
+        string Viewer_File_Path { get; set; }       
+        Timer Update_Timer { get; set; }
 
         public Main_Form()
         {
@@ -23,8 +28,10 @@ namespace Mining_Hub_Launcher
 
             Task.Run(() =>
             {
-                Server_File = File_Exists("Mining_Hub_Server.exe");
-                Viewer_File = File_Exists("Mining_Hub_Viewer.exe");
+                Server_File_Name = "Mining_Hub_Server.exe";
+                Viewer_File_Name = "Mining_Hub_Viewer.exe";
+                Server_File_Path = Get_File_Name_Path(Server_File_Name);
+                Viewer_File_Path = Get_File_Name_Path(Viewer_File_Name);
 
                 bool ready = false;
                 int retries = 5;
@@ -38,11 +45,27 @@ namespace Mining_Hub_Launcher
                 if (!ready) MessageBox.Show("Unable to get app files, please try again");
             });
         }
+        
+        private void Timer_Elapsed(object sender, EventArgs e)
+        {
+            ((Timer)sender).Stop();
+
+            // Update apps
+            Download_And_Unzip(Path.GetFileNameWithoutExtension(Server_File_Name) + ".zip");
+            Download_And_Unzip(Path.GetFileNameWithoutExtension(Viewer_File_Name) + ".zip");
+
+            ((Timer)sender).Start();
+        }
+
+
 
         void Main_Form_Load(object sender, EventArgs e)
         {
+            Update_Timer = new Timer();
+            Update_Timer.Tick += Timer_Elapsed;
+
             // Defaults
-            Updates_ComboBox.SelectedItem = "On App Start";
+            Updates_ComboBox.SelectedItem = "Once A Day";
 
             // Load settings
             foreach (RadioButton radio_button in App_Selection_GroupBox.Controls)
@@ -60,7 +83,7 @@ namespace Mining_Hub_Launcher
 
             // Auto start
             if (Auto_Start_CheckBox.Checked)
-                Launch_App();
+                Task.Run(() => { Launch_App(); });
         }
         void Main_Form_FormClosing(object sender, FormClosingEventArgs e)
         {
@@ -86,57 +109,85 @@ namespace Mining_Hub_Launcher
 
             if (selectedRadioButton.Name.Contains("Both"))
             {
-                Start_Executable(Server_File);
-                Start_Executable(Viewer_File);
+                Start_Executable(Server_File_Path);
+                Start_Executable(Viewer_File_Path);
             }
             else if (selectedRadioButton.Name.Contains("Work"))
             {
-                Start_Executable(Server_File);
+                Start_Executable(Server_File_Path);
             }
             else if (selectedRadioButton.Name.Contains("View"))
             {
-                Start_Executable(Viewer_File);
+                Start_Executable(Viewer_File_Path);
             } 
         }
+        private void Updates_ComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            StartTimer(Updates_ComboBox.Text);
+        }
 
+
+
+        void StartTimer(string update_interval)
+        {
+            Update_Timer.Stop();
+
+            TimeSpan interval = TimeSpan.Zero;
+
+            if (update_interval == "On App Start")
+            {
+                Download_And_Unzip(Path.GetFileNameWithoutExtension(Server_File_Name) + ".zip");
+                Download_And_Unzip(Path.GetFileNameWithoutExtension(Viewer_File_Name) + ".zip");
+                return;
+            }
+            else if (update_interval == "Once A Day")
+                interval = TimeSpan.FromDays(1);
+            else if (update_interval == "Once A Week")
+                interval = TimeSpan.FromDays(7);
+            else if (update_interval == "Once A Month")
+                interval = TimeSpan.FromDays(30);
+
+            Update_Timer.Interval = (int)interval.TotalMilliseconds;
+            Update_Timer.Start();
+        }
         bool Ensure_App_Files_Exist()
         {
             var error = false;
             string currentDir = Directory.GetCurrentDirectory();
 
             // Check Server folder
-            string serverDir = Path.Combine(currentDir, "Mining_Hub_Server");
+            string serverDir = Path.Combine(currentDir, Path.GetFileNameWithoutExtension(Server_File_Name));
             if (!Directory.Exists(serverDir))
             {
                 Directory.CreateDirectory(serverDir);
             }
 
             // Check Viewer folder
-            string viewerDir = Path.Combine(currentDir, "Mining_Hub_Viewer");
+            string viewerDir = Path.Combine(currentDir, Path.GetFileNameWithoutExtension(Viewer_File_Name));
             if (!Directory.Exists(viewerDir))
             {
                 Directory.CreateDirectory(viewerDir);
             }
 
             // Check Server file
-            if (!File.Exists(Server_File))
+            if (!File.Exists(Server_File_Path))
             {
-                error = !Download_And_Unzip("Mining_Hub_Server.zip");
+                error = !Download_And_Unzip(Path.GetFileNameWithoutExtension(Server_File_Name) + ".zip");
                 if (error) return false;
-                Server_File = File_Exists("Mining_Hub_Server.exe");
+                Server_File_Path = Get_File_Name_Path(Server_File_Name);
             }
 
             // Check Viewer file
-            if (!File.Exists(Viewer_File))
+            if (!File.Exists(Viewer_File_Path))
             {
-                error = !Download_And_Unzip("Mining_Hub_Viewer.zip");
+                error = !Download_And_Unzip(Path.GetFileNameWithoutExtension(Viewer_File_Name) + ".zip");
                 if (error) return false;
-                Viewer_File = File_Exists("Mining_Hub_Viewer.exe");
+                Viewer_File_Path = Get_File_Name_Path(Viewer_File_Name);
             }
 
             return true;
         }
-        public static bool Start_Executable(string file)
+        static bool Start_Executable(string file)
         {
             if (file == null || file.Length == 0) return false;
 
@@ -154,19 +205,57 @@ namespace Mining_Hub_Launcher
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error starting {file}: {ex.Message}");
+                //MessageBox.Show($"Error starting {file}: {ex.Message}");
                 return false;
             }
         }
         bool Download_And_Unzip(string filename)
         {
+            bool reopen_server = false;
+            bool reopen_viewer = false;
+            // Close apps if they are open
+            Process[] processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Server_File_Name));
+            if (processes.Length > 0)
+            {
+                processes[0].Kill();
+                reopen_server = true;
+            }
+            processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Viewer_File_Name));
+            if (processes.Length > 0)
+            {
+                processes[0].Kill();
+                reopen_viewer = true;
+            }
+
             string url = "http://thebox.loseyourip.com:8080/updates/" + filename;
             string folder = Directory.GetCurrentDirectory() + $"\\{Path.GetFileNameWithoutExtension(filename)}\\";
 
-            // Delete old files
+            // Delete old files (except configs)
             if (Directory.Exists(folder))
             {
-                Directory.Delete(folder, true);                
+                int retries = 4;
+                while (retries-- > 0)
+                {
+                    try
+                    {
+                        foreach (string file in Directory.GetFiles(folder))
+                        {
+                            if (!file.EndsWith(".config"))
+                            {
+                                File.Delete(file);
+                            }
+                        }
+                        foreach (string dir in Directory.GetDirectories(folder))
+                        {
+                            Directory.Delete(dir, true);
+                        }
+                        break;
+                    }
+                    catch
+                    {
+                        Thread.Sleep(1000);
+                    }
+                }
             }
 
             // Create folder
@@ -198,9 +287,11 @@ namespace Mining_Hub_Launcher
                         // If the entry is a directory, create it in the output folder
                         Directory.CreateDirectory(outputPath);
                     }
-                    else
+                    else  
                     {
-                        // If the entry is a file, extract it to the output folder
+                        // Skip the config file to keep settings
+                        if (entry.FullName.EndsWith(".config") && File.Exists(folder + "\\" + entry.FullName)) continue;
+
                         entry.ExtractToFile(outputPath, true);
                     }
                 }
@@ -208,13 +299,18 @@ namespace Mining_Hub_Launcher
 
             File.Delete(zipPath);
 
+            if (reopen_server)
+                Start_Executable(Server_File_Name);
+            if (reopen_viewer)
+                Start_Executable(Viewer_File_Name);
+
             return true;
         }
-        string File_Exists(string fileName)
+        static string Get_File_Name_Path(string fileName)
         {
             return SearchFileRecursive(new DirectoryInfo(Environment.CurrentDirectory), fileName);
         }
-        string SearchFileRecursive(DirectoryInfo directory, string fileName)
+        static string SearchFileRecursive(DirectoryInfo directory, string fileName)
         {
             try
             {
@@ -246,6 +342,6 @@ namespace Mining_Hub_Launcher
             }
 
             return "";
-        }
+        }        
     }
 }

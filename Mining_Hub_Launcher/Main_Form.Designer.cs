@@ -111,6 +111,7 @@
             this.Updates_ComboBox.Name = "Updates_ComboBox";
             this.Updates_ComboBox.Size = new System.Drawing.Size(121, 21);
             this.Updates_ComboBox.TabIndex = 2;
+            this.Updates_ComboBox.SelectedIndexChanged += new System.EventHandler(this.Updates_ComboBox_SelectedIndexChanged);
             // 
             // label1
             // 
