@@ -37,6 +37,8 @@ namespace Mining_Hub_Launcher
             ((Timer)sender).Start();
         }
 
+
+        // Start/Stop
         public Main_Form()
         {
             InitializeComponent();
@@ -84,6 +86,15 @@ namespace Mining_Hub_Launcher
             if (updates != null && updates.Length > 0)
                 Updates_ComboBox.Text = updates;
         }
+        private void Main_Form_Shown(object sender, EventArgs e)
+        {
+            // Auto start
+            if (Auto_Start_CheckBox.Checked)
+            {
+                WindowHelper.HideWindow(this.Handle);
+                Task.Run(() => { Launch_App(); });
+            }
+        }
         void Main_Form_FormClosing(object sender, FormClosingEventArgs e)
         {
             // Save settings
@@ -95,6 +106,29 @@ namespace Mining_Hub_Launcher
             App_Settings.Save(Updates_ComboBox.Name, Updates_ComboBox.Text);
         }
 
+
+
+        // User Actions
+        void Start_Button_Click(object sender, EventArgs e)
+        {
+            Launch_App();
+        }
+        private void Updates_ComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            StartTimer(Updates_ComboBox.Text);
+        }
+        private void Main_Form_Resize(object sender, EventArgs e)
+        {
+            if (WindowState == FormWindowState.Minimized)
+            {
+                this.Hide();
+            }
+        }
+
+
+
+        // Notify Icon
+        #region
         private void CreateNotifyIcon()
         {
             // create the notify icon
@@ -149,13 +183,11 @@ namespace Mining_Hub_Launcher
         {
             Application.Exit();
         }
+        #endregion
 
 
 
-        void Start_Button_Click(object sender, EventArgs e)
-        {
-            Launch_App();
-        }
+        // Utility
         void Launch_App()
         {
             RadioButton selectedRadioButton = App_Selection_GroupBox.Controls
@@ -176,16 +208,8 @@ namespace Mining_Hub_Launcher
             else if (selectedRadioButton.Name.Contains("View"))
             {
                 Start_Executable(Viewer_File_Path);
-            } 
+            }
         }
-        private void Updates_ComboBox_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            StartTimer(Updates_ComboBox.Text);
-        }
-
-
-
-
         void StartTimer(string update_interval)
         {
             Update_Timer.Stop();
@@ -244,12 +268,7 @@ namespace Mining_Hub_Launcher
             }
 
             return true;
-        }
-
-
-
-
-       
+        }       
         bool Start_Executable(string file)
         {
             if (file == null || file.Length == 0) return false;
@@ -425,63 +444,7 @@ namespace Mining_Hub_Launcher
             return "";
         }
 
-        private void Main_Form_Resize(object sender, EventArgs e)
-        {
-            if (WindowState == FormWindowState.Minimized)
-            {
-                this.Hide();
-            }
-        }
 
-        private void Main_Form_Shown(object sender, EventArgs e)
-        {
-            // Auto start
-            if (Auto_Start_CheckBox.Checked)
-            {
-                WindowHelper.HideWindow(this.Handle);
-                Task.Run(() => { Launch_App(); });
-            }
-        }
-    }
 
-    public class WindowHelper
-    {
-        [DllImport("user32.dll", SetLastError = true)]
-        static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-        [DllImport("user32", CharSet = CharSet.Ansi, SetLastError = true, ExactSpelling = true)]
-        static extern bool SetForegroundWindow(IntPtr hwnd);
-
-        [DllImport("user32.dll")]
-        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-        [DllImport("user32.dll")]
-        static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-
-        [DllImport("user32.dll")]
-        static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
-
-        const int GWL_EXSTYLE = -20;
-        const int WS_EX_TOOLWINDOW = 0x80;
-        const int SW_RESTORE = 9;
-        const int SW_MINIMIZE = 6;
-
-        public static void BringToFront(string windowTitle)
-        {
-            var hwnd = FindWindow(null, windowTitle);
-            SetForegroundWindow(hwnd);
-            ShowWindow(hwnd, SW_RESTORE);
-        }
-        public static void BringToFront(IntPtr hWnd)
-        {
-            SetForegroundWindow(hWnd);
-            ShowWindow(hWnd, SW_RESTORE);
-        }
-        public static void HideWindow(IntPtr hWnd)
-        {
-            ShowWindow(hWnd, SW_MINIMIZE);
-
-            // Remove the window from the taskbar
-            int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-            SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
-        }
     }
 }
