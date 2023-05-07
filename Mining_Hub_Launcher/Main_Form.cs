@@ -1,12 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
+using System.Windows.Automation;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
 using RadioButton = System.Windows.Forms.RadioButton;
@@ -16,15 +20,27 @@ namespace Mining_Hub_Launcher
 {
     public partial class Main_Form : Form
     {
+        NotifyIcon notify_icon;
         string Server_File_Name { get; set; }
         string Server_File_Path { get; set; }
         string Viewer_File_Name { get; set; }
         string Viewer_File_Path { get; set; }       
         Timer Update_Timer { get; set; }
+        private void Timer_Elapsed(object sender, EventArgs e)
+        {
+            ((Timer)sender).Stop();
+
+            // Update apps
+            Download_And_Unzip(Path.GetFileNameWithoutExtension(Server_File_Name) + ".zip");
+            Download_And_Unzip(Path.GetFileNameWithoutExtension(Viewer_File_Name) + ".zip");
+
+            ((Timer)sender).Start();
+        }
 
         public Main_Form()
         {
             InitializeComponent();
+            CreateNotifyIcon();
 
             Task.Run(() =>
             {
@@ -45,20 +61,6 @@ namespace Mining_Hub_Launcher
                 if (!ready) MessageBox.Show("Unable to get app files, please try again");
             });
         }
-        
-        private void Timer_Elapsed(object sender, EventArgs e)
-        {
-            ((Timer)sender).Stop();
-
-            // Update apps
-            Download_And_Unzip(Path.GetFileNameWithoutExtension(Server_File_Name) + ".zip");
-            Download_And_Unzip(Path.GetFileNameWithoutExtension(Viewer_File_Name) + ".zip");
-
-            ((Timer)sender).Start();
-        }
-
-
-
         void Main_Form_Load(object sender, EventArgs e)
         {
             Update_Timer = new Timer();
@@ -66,6 +68,7 @@ namespace Mining_Hub_Launcher
 
             // Defaults
             Updates_ComboBox.SelectedItem = "Once A Day";
+            Auto_Start_CheckBox.Checked = false;
 
             // Load settings
             foreach (RadioButton radio_button in App_Selection_GroupBox.Controls)
@@ -73,28 +76,82 @@ namespace Mining_Hub_Launcher
                 if (bool.TryParse(App_Settings.Load(radio_button.Name), out var check_val))
                     radio_button.Checked = check_val;
             }
-            
+
             if (bool.TryParse(App_Settings.Load(Auto_Start_CheckBox.Name), out var val))
                 Auto_Start_CheckBox.Checked = val;
 
             var updates = App_Settings.Load(Updates_ComboBox.Name);
             if (updates != null && updates.Length > 0)
                 Updates_ComboBox.Text = updates;
-
-            // Auto start
-            if (Auto_Start_CheckBox.Checked)
-                Task.Run(() => { Launch_App(); });
         }
         void Main_Form_FormClosing(object sender, FormClosingEventArgs e)
         {
             // Save settings
-            foreach(RadioButton radio_button in App_Selection_GroupBox.Controls)
+            foreach (RadioButton radio_button in App_Selection_GroupBox.Controls)
             {
                 App_Settings.Save(radio_button.Name, radio_button.Checked.ToString());
             }
             App_Settings.Save(Auto_Start_CheckBox.Name, Auto_Start_CheckBox.Checked.ToString());
             App_Settings.Save(Updates_ComboBox.Name, Updates_ComboBox.Text);
         }
+
+        private void CreateNotifyIcon()
+        {
+            // create the notify icon
+            notify_icon = new NotifyIcon();
+            notify_icon.Icon = Properties.Resources.picture; 
+            notify_icon.Text = "Mining Hub"; // set the tooltip text
+            notify_icon.Visible = true;
+
+            // add a context menu to the notify icon
+            ContextMenuStrip contextMenu = new ContextMenuStrip();
+            contextMenu.Items.Add("Launch Worker", null, OnWorker);
+            contextMenu.Items.Add("Launch Viewer", null, OnViewer);
+            contextMenu.Items.Add("Launch Both", null, OnBoth);
+            contextMenu.Items.Add("Update", null, OnUpdate);
+            contextMenu.Items.Add("Settings", null, OnShow);
+            contextMenu.Items.Add("Exit", null, OnExit);            
+            notify_icon.ContextMenuStrip = contextMenu;
+        }
+
+        private void OnBoth(object sender, EventArgs e)
+        {
+            Start_Executable(Server_File_Path);
+            Start_Executable(Viewer_File_Path);
+        }
+
+        private void OnViewer(object sender, EventArgs e)
+        {
+            Start_Executable(Viewer_File_Path);
+        }
+
+        private void OnWorker(object sender, EventArgs e)
+        {
+            Start_Executable(Server_File_Path);
+        }
+
+        private void OnUpdate(object sender, EventArgs e)
+        {
+            Download_And_Unzip(Path.GetFileNameWithoutExtension(Server_File_Name) + ".zip");
+            Download_And_Unzip(Path.GetFileNameWithoutExtension(Viewer_File_Name) + ".zip");
+            notify_icon.ShowBalloonTip(3000, "Mining Hub", "Update Successful", ToolTipIcon.Info);
+        }
+
+        private void OnShow(object sender, EventArgs e)
+        {
+            this.Show();
+            this.WindowState = FormWindowState.Normal;
+            this.FormBorderStyle = FormBorderStyle.Sizable;
+            WindowHelper.BringToFront(this.Handle);
+        }
+
+        private void OnExit(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
+
+
+
         void Start_Button_Click(object sender, EventArgs e)
         {
             Launch_App();
@@ -125,6 +182,7 @@ namespace Mining_Hub_Launcher
         {
             StartTimer(Updates_ComboBox.Text);
         }
+
 
 
 
@@ -187,7 +245,12 @@ namespace Mining_Hub_Launcher
 
             return true;
         }
-        static bool Start_Executable(string file)
+
+
+
+
+       
+        bool Start_Executable(string file)
         {
             if (file == null || file.Length == 0) return false;
 
@@ -195,6 +258,24 @@ namespace Mining_Hub_Launcher
             Process[] processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(file));
             if (processes.Length > 0)
             {
+                if (processes[0].MainWindowHandle != IntPtr.Zero)
+                {
+                    // For WinForms app
+                    WindowHelper.BringToFront(processes[0].MainWindowHandle);                    
+                }
+                else
+                {
+                    // For console app
+                    string windowTitle = file;
+
+                    if (file == Server_File_Name)
+                        windowTitle = Server_File_Path;
+                    else if(file == Viewer_File_Name)
+                        windowTitle = Viewer_File_Path;
+
+                    WindowHelper.BringToFront(windowTitle);
+                }
+
                 return true; // Already running
             }
 
@@ -342,6 +423,65 @@ namespace Mining_Hub_Launcher
             }
 
             return "";
-        }        
+        }
+
+        private void Main_Form_Resize(object sender, EventArgs e)
+        {
+            if (WindowState == FormWindowState.Minimized)
+            {
+                this.Hide();
+            }
+        }
+
+        private void Main_Form_Shown(object sender, EventArgs e)
+        {
+            // Auto start
+            if (Auto_Start_CheckBox.Checked)
+            {
+                WindowHelper.HideWindow(this.Handle);
+                Task.Run(() => { Launch_App(); });
+            }
+        }
+    }
+
+    public class WindowHelper
+    {
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+        [DllImport("user32", CharSet = CharSet.Ansi, SetLastError = true, ExactSpelling = true)]
+        static extern bool SetForegroundWindow(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+        [DllImport("user32.dll")]
+        static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll")]
+        static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        const int GWL_EXSTYLE = -20;
+        const int WS_EX_TOOLWINDOW = 0x80;
+        const int SW_RESTORE = 9;
+        const int SW_MINIMIZE = 6;
+
+        public static void BringToFront(string windowTitle)
+        {
+            var hwnd = FindWindow(null, windowTitle);
+            SetForegroundWindow(hwnd);
+            ShowWindow(hwnd, SW_RESTORE);
+        }
+        public static void BringToFront(IntPtr hWnd)
+        {
+            SetForegroundWindow(hWnd);
+            ShowWindow(hWnd, SW_RESTORE);
+        }
+        public static void HideWindow(IntPtr hWnd)
+        {
+            ShowWindow(hWnd, SW_MINIMIZE);
+
+            // Remove the window from the taskbar
+            int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+            SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
+        }
     }
 }

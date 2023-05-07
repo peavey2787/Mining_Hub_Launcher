@@ -156,9 +156,11 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
             this.Name = "Main_Form";
-            this.Text = "Mining Hub Launcher";
+            this.Text = "Mining Hub";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Main_Form_FormClosing);
             this.Load += new System.EventHandler(this.Main_Form_Load);
+            this.Shown += new System.EventHandler(this.Main_Form_Shown);
+            this.Resize += new System.EventHandler(this.Main_Form_Resize);
             this.App_Selection_GroupBox.ResumeLayout(false);
             this.App_Selection_GroupBox.PerformLayout();
             this.ResumeLayout(false);
