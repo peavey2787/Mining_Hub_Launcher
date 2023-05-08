@@ -382,7 +382,7 @@ namespace Mining_Hub_Launcher
                 {
                     string outputPath = Path.Combine(folder, entry.FullName);
 
-                    if (entry.FullName.EndsWith("/"))
+                    if (entry.FullName.EndsWith("/") || entry.FullName.EndsWith("\\"))
                     {
                         // If the entry is a directory, create it in the output folder
                         Directory.CreateDirectory(outputPath);
