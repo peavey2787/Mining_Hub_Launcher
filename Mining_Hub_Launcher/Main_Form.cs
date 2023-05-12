@@ -166,9 +166,19 @@ namespace Mining_Hub_Launcher
 
         private void OnUpdate(object sender, EventArgs e)
         {
-            Download_And_Unzip(Path.GetFileNameWithoutExtension(Server_File_Name) + ".zip");
-            Download_And_Unzip(Path.GetFileNameWithoutExtension(Viewer_File_Name) + ".zip");
-            notify_icon.ShowBalloonTip(3000, "Mining Hub", "Update Successful", ToolTipIcon.Info);
+            string message = "";
+            
+            if (Download_And_Unzip(Path.GetFileNameWithoutExtension(Server_File_Name) + ".zip"))
+                message += "Server Updated Successfully";
+            else
+                message += "Server Was Not Updated!";
+
+            if (Download_And_Unzip(Path.GetFileNameWithoutExtension(Viewer_File_Name) + ".zip"))
+                message += "\nViewer Updated Successfully";
+            else
+                message += "\nViewer Was Not Updated!";
+
+            notify_icon.ShowBalloonTip(3000, "Mining Hub", message, ToolTipIcon.Info);
         }
 
         private void OnShow(object sender, EventArgs e)
@@ -400,9 +410,9 @@ namespace Mining_Hub_Launcher
             File.Delete(zipPath);
 
             if (reopen_server)
-                Start_Executable(Server_File_Name);
+                Start_Executable(Server_File_Path);
             if (reopen_viewer)
-                Start_Executable(Viewer_File_Name);
+                Start_Executable(Viewer_File_Path);
 
             return true;
         }
