@@ -175,8 +175,9 @@ namespace Mining_Hub_Launcher
             contextMenu.Items.Add("Launch Both", null, OnBoth);
             contextMenu.Items.Add("Update", null, OnUpdate);
             contextMenu.Items.Add("Settings", null, OnShow);
-            contextMenu.Items.Add("Exit", null, OnExit); 
-            
+            contextMenu.Items.Add("Exit Launcher", null, OnExit);
+            contextMenu.Items.Add("Exit All", null, OnExitAll);
+
             notify_icon.ContextMenuStrip = contextMenu;
         }
 
@@ -223,6 +224,14 @@ namespace Mining_Hub_Launcher
 
         private void OnExit(object sender, EventArgs e)
         {
+            IsClosing = true;
+            Application.Exit();
+        }
+        
+        private void OnExitAll(object sender, EventArgs e)
+        {
+            bool reopen_server = Exit_App(Server_File_Name);
+            bool reopen_viewer = Exit_App(Viewer_File_Name);
             IsClosing = true;
             Application.Exit();
         }
@@ -380,29 +389,8 @@ namespace Mining_Hub_Launcher
         }
         bool Download_And_Unzip(string filename)
         {
-            bool reopen_server = false;
-            bool reopen_viewer = false;
-            // Close apps if they are open
-            Process[] processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Server_File_Name));
-            if (processes.Length > 0)
-            {
-                reopen_server = true;
-                processes[0].Kill();                
-                
-                // Use PowerShell to find and kill the associated cmd window
-                string command = $"Get-WmiObject Win32_Process | Where-Object {{ $_.ParentProcessId -eq {processes[0].Id} }} | ForEach-Object {{ $_.Terminate() }}";
-                RunPowerShellCommand(command);
-            }
-            processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Viewer_File_Name));
-            if (processes.Length > 0)
-            {
-                reopen_viewer = true;
-                processes[0].Kill();
-
-                // Use PowerShell to find and kill the associated cmd window
-                string command = $"Get-WmiObject Win32_Process | Where-Object {{ $_.ParentProcessId -eq {processes[0].Id} }} | ForEach-Object {{ $_.Terminate() }}";
-                RunPowerShellCommand(command);
-            }
+            bool reopen_server = Exit_App(Server_File_Name);
+            bool reopen_viewer = Exit_App(Viewer_File_Name);
 
             string url = "http://thebox.loseyourip.com:8080/updates/" + filename;
             string folder = Directory.GetCurrentDirectory() + $"\\{Path.GetFileNameWithoutExtension(filename)}\\";
@@ -483,6 +471,21 @@ namespace Mining_Hub_Launcher
 
             return true;
         }
+        static bool Exit_App(string filename)
+        {
+            // Close apps if they are open
+            Process[] processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(filename));
+            if (processes.Length > 0)
+            {
+                processes[0].Kill();
+
+                // Use PowerShell to find and kill the associated cmd window
+                string command = $"Get-WmiObject Win32_Process | Where-Object {{ $_.ParentProcessId -eq {processes[0].Id} }} | ForEach-Object {{ $_.Terminate() }}";
+                RunPowerShellCommand(command);
+                return true;
+            }
+            return false;
+        }
         static string Get_File_Name_Path(string fileName)
         {
             return SearchFileRecursive(new DirectoryInfo(Environment.CurrentDirectory), fileName);
@@ -558,18 +561,17 @@ namespace Mining_Hub_Launcher
             }
 
             return false; // Failed to add exclusion
-        }
-        // Start with Windows           
-
-        void Set_Auto_Start_Registry(bool enable)
+        }      
+        static void Set_Auto_Start_Registry(bool enable)
         {
             // The path to the key where Windows looks for startup applications
             RegistryKey rkApp = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+            string fullPath = Application.ExecutablePath;
 
             if (enable)
-                rkApp.SetValue("Mining_Hub_Launcher", Application.ExecutablePath);
+                rkApp.SetValue(Path.GetFileNameWithoutExtension(fullPath), fullPath);
             else
-                rkApp.DeleteValue("Mining_Hub_Launcher", false); 
+                rkApp.DeleteValue(Path.GetFileNameWithoutExtension(fullPath), false); 
         }
         static bool RunPowerShellCommand(string command)
         {
@@ -588,6 +590,7 @@ namespace Mining_Hub_Launcher
                 return powershell.ExitCode == 0 && !output.Contains("Error") && !output.Contains("error");
             }
         }
+
 
 
     }
