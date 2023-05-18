@@ -38,6 +38,7 @@
             this.label1 = new System.Windows.Forms.Label();
             this.Start_Button = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
+            this.Auto_Start_Win_CheckBox = new System.Windows.Forms.CheckBox();
             this.App_Selection_GroupBox.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -91,12 +92,13 @@
             this.Auto_Start_CheckBox.AutoSize = true;
             this.Auto_Start_CheckBox.Checked = true;
             this.Auto_Start_CheckBox.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.Auto_Start_CheckBox.Location = new System.Drawing.Point(83, 196);
+            this.Auto_Start_CheckBox.Location = new System.Drawing.Point(53, 187);
             this.Auto_Start_CheckBox.Name = "Auto_Start_CheckBox";
-            this.Auto_Start_CheckBox.Size = new System.Drawing.Size(79, 17);
+            this.Auto_Start_CheckBox.Size = new System.Drawing.Size(160, 17);
             this.Auto_Start_CheckBox.TabIndex = 1;
-            this.Auto_Start_CheckBox.Text = "Auto Start?";
+            this.Auto_Start_CheckBox.Text = "Auto Start Above Selection?";
             this.Auto_Start_CheckBox.UseVisualStyleBackColor = true;
+            this.Auto_Start_CheckBox.CheckedChanged += new System.EventHandler(this.Auto_Start_CheckBox_CheckedChanged);
             // 
             // Updates_ComboBox
             // 
@@ -106,8 +108,9 @@
             "On App Start",
             "Once A Day",
             "Once A Week",
-            "Once A Month"});
-            this.Updates_ComboBox.Location = new System.Drawing.Point(64, 261);
+            "Once A Month",
+            "Never"});
+            this.Updates_ComboBox.Location = new System.Drawing.Point(64, 271);
             this.Updates_ComboBox.Name = "Updates_ComboBox";
             this.Updates_ComboBox.Size = new System.Drawing.Size(121, 21);
             this.Updates_ComboBox.TabIndex = 2;
@@ -116,7 +119,7 @@
             // label1
             // 
             this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(71, 236);
+            this.label1.Location = new System.Drawing.Point(71, 249);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(99, 13);
             this.label1.TabIndex = 3;
@@ -142,11 +145,23 @@
             this.label2.TabIndex = 5;
             this.label2.Text = "Mining Hub Launcher";
             // 
+            // Auto_Start_Win_CheckBox
+            // 
+            this.Auto_Start_Win_CheckBox.AutoSize = true;
+            this.Auto_Start_Win_CheckBox.Location = new System.Drawing.Point(52, 216);
+            this.Auto_Start_Win_CheckBox.Name = "Auto_Start_Win_CheckBox";
+            this.Auto_Start_Win_CheckBox.Size = new System.Drawing.Size(148, 17);
+            this.Auto_Start_Win_CheckBox.TabIndex = 6;
+            this.Auto_Start_Win_CheckBox.Text = "Auto Start with Windows?";
+            this.Auto_Start_Win_CheckBox.UseVisualStyleBackColor = true;
+            this.Auto_Start_Win_CheckBox.CheckedChanged += new System.EventHandler(this.Auto_Start_Win_CheckBox_CheckedChanged);
+            // 
             // Main_Form
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(259, 346);
+            this.Controls.Add(this.Auto_Start_Win_CheckBox);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.Start_Button);
             this.Controls.Add(this.label1);
@@ -179,6 +194,7 @@
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Button Start_Button;
         private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.CheckBox Auto_Start_Win_CheckBox;
     }
 }
 

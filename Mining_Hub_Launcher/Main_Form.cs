@@ -7,6 +7,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,7 +26,9 @@ namespace Mining_Hub_Launcher
         string Server_File_Name { get; set; }
         string Server_File_Path { get; set; }
         string Viewer_File_Name { get; set; }
-        string Viewer_File_Path { get; set; }       
+        string Viewer_File_Path { get; set; }
+        bool Resetting = false;
+        bool StartingUp = true;
         Timer Update_Timer { get; set; }
         private void Timer_Elapsed(object sender, EventArgs e)
         {
@@ -71,10 +74,6 @@ namespace Mining_Hub_Launcher
             Update_Timer = new Timer();
             Update_Timer.Tick += Timer_Elapsed;
 
-            // Defaults
-            Updates_ComboBox.SelectedItem = "Once A Day";
-            Auto_Start_CheckBox.Checked = false;
-
             // Load settings
             foreach (RadioButton radio_button in App_Selection_GroupBox.Controls)
             {
@@ -84,6 +83,9 @@ namespace Mining_Hub_Launcher
 
             if (bool.TryParse(App_Settings.Load(Auto_Start_CheckBox.Name), out var val))
                 Auto_Start_CheckBox.Checked = val;
+
+            if (bool.TryParse(App_Settings.Load(Auto_Start_Win_CheckBox.Name), out var win_val))
+                Auto_Start_Win_CheckBox.Checked = win_val;
 
             var updates = App_Settings.Load(Updates_ComboBox.Name);
             if (updates != null && updates.Length > 0)
@@ -97,16 +99,12 @@ namespace Mining_Hub_Launcher
                 WindowHelper.HideWindow(this.Handle);
                 Task.Run(() => { Launch_App(); });
             }
+
+            StartingUp = false;
         }
         void Main_Form_FormClosing(object sender, FormClosingEventArgs e)
         {
-            // Save settings
-            foreach (RadioButton radio_button in App_Selection_GroupBox.Controls)
-            {
-                App_Settings.Save(radio_button.Name, radio_button.Checked.ToString());
-            }
-            App_Settings.Save(Auto_Start_CheckBox.Name, Auto_Start_CheckBox.Checked.ToString());
-            App_Settings.Save(Updates_ComboBox.Name, Updates_ComboBox.Text);
+            SaveSettings();
         }
 
 
@@ -118,7 +116,9 @@ namespace Mining_Hub_Launcher
         }
         private void Updates_ComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
+            if (StartingUp) return;
             StartTimer(Updates_ComboBox.Text);
+            SaveSettings();
         }
         private void Main_Form_Resize(object sender, EventArgs e)
         {
@@ -126,6 +126,27 @@ namespace Mining_Hub_Launcher
             {
                 this.Hide();
             }
+        }
+        private void Auto_Start_CheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            if (StartingUp) return;
+            SaveSettings();
+        }
+        private void Auto_Start_Win_CheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            if (StartingUp) return;
+            if (!Resetting)
+            {
+                Set_Auto_Start_Registry(Auto_Start_Win_CheckBox.Checked);
+                SaveSettings();
+            }
+            else if(!Resetting)
+            {
+                Resetting = true;
+                Auto_Start_Win_CheckBox.Checked = !Auto_Start_Win_CheckBox.Checked;
+            }
+            else if(Resetting)
+                Resetting = false;
         }
 
 
@@ -201,6 +222,17 @@ namespace Mining_Hub_Launcher
 
 
         // Utility
+        void SaveSettings()
+        {
+            // Save settings
+            foreach (RadioButton radio_button in App_Selection_GroupBox.Controls)
+            {
+                App_Settings.Save(radio_button.Name, radio_button.Checked.ToString());
+            }
+            App_Settings.Save(Auto_Start_CheckBox.Name, Auto_Start_CheckBox.Checked.ToString());
+            App_Settings.Save(Auto_Start_Win_CheckBox.Name, Auto_Start_Win_CheckBox.Checked.ToString());
+            App_Settings.Save(Updates_ComboBox.Name, Updates_ComboBox.Text);
+        }
         void Launch_App()
         {
             RadioButton selectedRadioButton = App_Selection_GroupBox.Controls
@@ -241,6 +273,8 @@ namespace Mining_Hub_Launcher
                 interval = TimeSpan.FromDays(7);
             else if (update_interval == "Once A Month")
                 interval = TimeSpan.FromDays(30);
+            else if (update_interval == "Never")
+                return;
 
             Update_Timer.Interval = (int)interval.TotalMilliseconds;
             Update_Timer.Start();
@@ -343,14 +377,22 @@ namespace Mining_Hub_Launcher
             Process[] processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Server_File_Name));
             if (processes.Length > 0)
             {
-                processes[0].Kill();
                 reopen_server = true;
+                processes[0].Kill();                
+                
+                // Use PowerShell to find and kill the associated cmd window
+                string command = $"Get-WmiObject Win32_Process | Where-Object {{ $_.ParentProcessId -eq {processes[0].Id} }} | ForEach-Object {{ $_.Terminate() }}";
+                RunPowerShellCommand(command);
             }
             processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Viewer_File_Name));
             if (processes.Length > 0)
             {
-                processes[0].Kill();
                 reopen_viewer = true;
+                processes[0].Kill();
+
+                // Use PowerShell to find and kill the associated cmd window
+                string command = $"Get-WmiObject Win32_Process | Where-Object {{ $_.ParentProcessId -eq {processes[0].Id} }} | ForEach-Object {{ $_.Terminate() }}";
+                RunPowerShellCommand(command);
             }
 
             string url = "http://thebox.loseyourip.com:8080/updates/" + filename;
@@ -507,6 +549,35 @@ namespace Mining_Hub_Launcher
             }
 
             return false; // Failed to add exclusion
+        }
+        // Start with Windows           
+
+        void Set_Auto_Start_Registry(bool enable)
+        {
+            // The path to the key where Windows looks for startup applications
+            RegistryKey rkApp = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+
+            if (enable)
+                rkApp.SetValue("Mining_Hub_Launcher", Application.ExecutablePath);
+            else
+                rkApp.DeleteValue("Mining_Hub_Launcher", false); 
+        }
+        static bool RunPowerShellCommand(string command)
+        {
+            using (Process powershell = new Process())
+            {
+                powershell.StartInfo.FileName = "powershell.exe";
+                powershell.StartInfo.Arguments = $"-Command \"{command}\"";
+                powershell.StartInfo.Verb = "runas";
+                powershell.StartInfo.UseShellExecute = false;
+                powershell.StartInfo.RedirectStandardOutput = true;
+                powershell.Start();
+
+                string output = powershell.StandardOutput.ReadToEnd();
+                powershell.WaitForExit();
+
+                return powershell.ExitCode == 0 && !output.Contains("Error") && !output.Contains("error");
+            }
         }
 
 
