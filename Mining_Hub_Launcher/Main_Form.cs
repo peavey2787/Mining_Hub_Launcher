@@ -1,4 +1,5 @@
 ﻿using Microsoft.Win32;
+using Microsoft.Win32.TaskScheduler;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,6 +17,7 @@ using System.Windows.Automation;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
 using RadioButton = System.Windows.Forms.RadioButton;
+using Task = System.Threading.Tasks.Task;
 using Timer = System.Windows.Forms.Timer;
 
 namespace Mining_Hub_Launcher
@@ -142,18 +144,32 @@ namespace Mining_Hub_Launcher
         private void Auto_Start_Win_CheckBox_CheckedChanged(object sender, EventArgs e)
         {
             if (StartingUp) return;
-            if (!Resetting)
+
+            string fullPath = Application.ExecutablePath;
+            string name = Path.GetFileNameWithoutExtension(fullPath);            
+
+            if (Auto_Start_CheckBox.Checked)
             {
-                Set_Auto_Start_Registry(Auto_Start_Win_CheckBox.Checked);
-                SaveSettings();
+                bool success = CreateSchedulerTask(name, fullPath);
+                if (!success)
+                {
+                    notify_icon.ShowBalloonTip(3000, "Mining Hub", "Unable to add auto start to Windows task scheduler", ToolTipIcon.Info);
+                    Auto_Start_CheckBox.Checked = false;
+                }
+                else
+                    SaveSettings();
             }
-            else if(!Resetting)
+            else
             {
-                Resetting = true;
-                Auto_Start_Win_CheckBox.Checked = !Auto_Start_Win_CheckBox.Checked;
+                bool success = CreateSchedulerTask(name, fullPath, true);
+                if (!success)
+                {
+                    notify_icon.ShowBalloonTip(3000, "Mining Hub", "Unable to delete auto start from Windows task scheduler", ToolTipIcon.Info);
+                    Auto_Start_CheckBox.Checked = true;
+                }
+                else
+                    SaveSettings();
             }
-            else if(Resetting)
-                Resetting = false;
         }
 
 
@@ -562,17 +578,6 @@ namespace Mining_Hub_Launcher
 
             return false; // Failed to add exclusion
         }      
-        static void Set_Auto_Start_Registry(bool enable)
-        {
-            // The path to the key where Windows looks for startup applications
-            RegistryKey rkApp = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-            string fullPath = Application.ExecutablePath;
-
-            if (enable)
-                rkApp.SetValue(Path.GetFileNameWithoutExtension(fullPath), fullPath);
-            else
-                rkApp.DeleteValue(Path.GetFileNameWithoutExtension(fullPath), false); 
-        }
         static bool RunPowerShellCommand(string command)
         {
             using (Process powershell = new Process())
@@ -590,7 +595,48 @@ namespace Mining_Hub_Launcher
                 return powershell.ExitCode == 0 && !output.Contains("Error") && !output.Contains("error");
             }
         }
+        public static bool CreateSchedulerTask(string taskName, string applicationPath, bool deleteTask = false)
+        {
+            try
+            {
+                using (TaskService taskService = new TaskService())
+                {
+                    TaskDefinition taskDefinition = taskService.NewTask();
 
+                    // Set the task properties
+                    taskDefinition.RegistrationInfo.Description = "Auto Start Application on Startup";
+                    taskDefinition.Principal.RunLevel = TaskRunLevel.Highest;  // Run with highest privileges
+
+                    // Create a trigger to run the task on system startup
+                    BootTrigger trigger = new BootTrigger();
+                    taskDefinition.Triggers.Add(trigger);
+
+                    // Create an action to start the application
+                    string actionPath = applicationPath;
+                    string actionArguments = "";  // You can specify additional arguments here if needed
+                    taskDefinition.Actions.Add(new ExecAction(actionPath, actionArguments,  Path.GetDirectoryName(applicationPath)));
+
+                    // Check if the task already exists
+                    if (taskService.GetTask(taskName) != null)
+                    {
+                        // Delete the existing task
+                        taskService.RootFolder.DeleteTask(taskName, false);
+
+                        // Return before adding it again
+                        if (deleteTask) return true;
+                    }
+
+                    // Register the new task
+                    taskService.RootFolder.RegisterTaskDefinition(taskName, taskDefinition);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+        }
 
 
     }
