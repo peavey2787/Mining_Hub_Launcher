@@ -29,6 +29,7 @@ namespace Mining_Hub_Launcher
         string Viewer_File_Path { get; set; }
         bool Resetting = false;
         bool StartingUp = true;
+        bool IsClosing = false;
         Timer Update_Timer { get; set; }
         private void Timer_Elapsed(object sender, EventArgs e)
         {
@@ -104,7 +105,13 @@ namespace Mining_Hub_Launcher
         }
         void Main_Form_FormClosing(object sender, FormClosingEventArgs e)
         {
-            SaveSettings();
+            if (!IsClosing)
+            {
+                e.Cancel = true;  // Cancel the closing action
+                this.Hide();      // Hide the form
+            }
+            else
+                SaveSettings();
         }
 
 
@@ -168,7 +175,8 @@ namespace Mining_Hub_Launcher
             contextMenu.Items.Add("Launch Both", null, OnBoth);
             contextMenu.Items.Add("Update", null, OnUpdate);
             contextMenu.Items.Add("Settings", null, OnShow);
-            contextMenu.Items.Add("Exit", null, OnExit);            
+            contextMenu.Items.Add("Exit", null, OnExit); 
+            
             notify_icon.ContextMenuStrip = contextMenu;
         }
 
@@ -215,6 +223,7 @@ namespace Mining_Hub_Launcher
 
         private void OnExit(object sender, EventArgs e)
         {
+            IsClosing = true;
             Application.Exit();
         }
         #endregion
