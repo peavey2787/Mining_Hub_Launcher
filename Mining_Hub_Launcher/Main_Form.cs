@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using System.Windows.Automation;
 using System.Windows.Forms;
+using System.Xml;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
 using RadioButton = System.Windows.Forms.RadioButton;
 using Task = System.Threading.Tasks.Task;
@@ -541,42 +542,9 @@ namespace Mining_Hub_Launcher
         }
         static public bool AddWindowsDefenderExclusion(string pathToExclude)
         {
-            const string powerShellCommand = "Add-MpPreference";
-            const string powerShellArgument = "-ExclusionPath";
-            const string powerShellForceArgument = "-Force";
-
-            try
-            {
-                // Create a PowerShell process start info
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Verb = "runas", // Run as administrator
-                    Arguments = $"{powerShellCommand} {powerShellArgument} \"{pathToExclude}\" {powerShellForceArgument}",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                // Start the PowerShell process
-                using (var process = new Process())
-                {
-                    process.StartInfo = startInfo;
-                    process.Start();
-                    process.WaitForExit();
-
-                    // Check if the exclusion was added successfully
-                    if (process.ExitCode == 0)
-                    {
-                        return true; // Exclusion added successfully
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error occurred while adding exclusion: {ex.Message}");
-            }
-
-            return false; // Failed to add exclusion
+            string powerShellCommand = $"Add-MpPreference -ExclusionPath \"{pathToExclude}\" -Force";
+            bool sucess = RunPowerShellCommand(powerShellCommand);
+            return sucess;
         }      
         static bool RunPowerShellCommand(string command)
         {
@@ -634,6 +602,7 @@ namespace Mining_Hub_Launcher
             }
             catch (Exception ex)
             {
+                MessageBox.Show($"Failed to add auto start task to windows task scheduler: {ex.Message}");
                 return false;
             }
         }
