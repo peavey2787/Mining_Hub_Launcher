@@ -587,9 +587,15 @@ namespace Mining_Hub_Launcher
                     // Set the task properties
                     taskDefinition.RegistrationInfo.Description = "Auto Start Application on Startup";
                     taskDefinition.Principal.RunLevel = TaskRunLevel.Highest;  // Run with highest privileges
+                    //taskDefinition.Principal.LogonType = TaskLogonType.None;
+
+                    // Set the task settings
+                    taskDefinition.Settings.ExecutionTimeLimit = TimeSpan.Zero; // Do not stop the task if it runs longer than 3 days
+                    taskDefinition.Settings.StartWhenAvailable = true; // Run the task as soon as possible after a scheduled start is missed
 
                     // Create a trigger to run the task on system startup
-                    BootTrigger trigger = new BootTrigger();
+                    //BootTrigger trigger = new BootTrigger();
+                    LogonTrigger trigger = new LogonTrigger();
                     taskDefinition.Triggers.Add(trigger);
 
                     // Create an action to start the application
@@ -597,6 +603,7 @@ namespace Mining_Hub_Launcher
                     string actionArguments = "";  // You can specify additional arguments here if needed
                     taskDefinition.Actions.Add(new ExecAction(actionPath, actionArguments,  Path.GetDirectoryName(applicationPath)));
 
+                    /*
                     // Check if the task already exists
                     if (taskService.GetTask(taskName) != null)
                     {
@@ -605,10 +612,11 @@ namespace Mining_Hub_Launcher
 
                         // Return before adding it again
                         if (deleteTask) return true;
-                    }
+                    }*/
 
                     // Register the new task
-                    taskService.RootFolder.RegisterTaskDefinition(taskName, taskDefinition);
+                    //taskService.RootFolder.RegisterTaskDefinition(taskName, taskDefinition);
+                    taskService.RootFolder.RegisterTaskDefinition(taskName, taskDefinition, TaskCreation.CreateOrUpdate, null, null, TaskLogonType.None, null);
                 }
 
                 return true;
