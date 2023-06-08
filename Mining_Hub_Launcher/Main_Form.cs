@@ -16,6 +16,7 @@ using System.Timers;
 using System.Windows.Automation;
 using System.Windows.Forms;
 using System.Xml;
+using System.Xml.Linq;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
 using RadioButton = System.Windows.Forms.RadioButton;
 using Task = System.Threading.Tasks.Task;
@@ -464,20 +465,29 @@ namespace Mining_Hub_Launcher
                 {
                     string outputPath = Path.Combine(folder, entry.FullName);
 
+                    // Skip the config file to keep settings
+                    if (entry.FullName.EndsWith(".config") && File.Exists(outputPath))
+                        continue;
+
+                    // Skip miners
+                    if (entry.FullName.Contains("/miners/"))
+                        continue;
+
                     if (entry.FullName.EndsWith("/") || entry.FullName.EndsWith("\\"))
                     {
                         // If the entry is a directory, create it in the output folder
                         Directory.CreateDirectory(outputPath);
                     }
-                    else  
+                    else
                     {
-                        // Skip the config file to keep settings
-                        if (entry.FullName.EndsWith(".config") && File.Exists(folder + "\\" + entry.FullName)) continue;
+                        // Ensure the parent directory exists before extracting the file
+                        Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
 
                         entry.ExtractToFile(outputPath, true);
                     }
                 }
             }
+
 
             File.Delete(zipPath);
 
@@ -505,7 +515,10 @@ namespace Mining_Hub_Launcher
         }
         static string Get_File_Name_Path(string fileName)
         {
-            return SearchFileRecursive(new DirectoryInfo(Environment.CurrentDirectory), fileName);
+            string path = SearchFileRecursive(new DirectoryInfo(Environment.CurrentDirectory), fileName);
+            if(path == null || String.IsNullOrWhiteSpace(path)) 
+                path = $"{Directory.GetCurrentDirectory()}\\{Path.GetFileNameWithoutExtension(fileName)}\\{fileName}";
+            return path;
         }
         static string SearchFileRecursive(DirectoryInfo directory, string fileName)
         {
