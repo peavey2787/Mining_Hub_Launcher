@@ -31,6 +31,7 @@ namespace Mining_Hub_Launcher
         string Server_File_Path { get; set; }
         string Viewer_File_Name { get; set; }
         string Viewer_File_Path { get; set; }
+        string Launcher_File_Path { get; set; }
         bool Resetting = false;
         bool StartingUp = true;
         bool IsClosing = false;
@@ -59,6 +60,7 @@ namespace Mining_Hub_Launcher
                 Viewer_File_Name = "Mining_Hub_Viewer.exe";
                 Server_File_Path = Get_File_Name_Path(Server_File_Name);
                 Viewer_File_Path = Get_File_Name_Path(Viewer_File_Name);
+                Launcher_File_Path = $"{Directory.GetCurrentDirectory()}\\Mining_Hub_Launcher.exe";
 
                 Ensure_Defender_Exclusions_Exist();
 
@@ -363,6 +365,14 @@ namespace Mining_Hub_Launcher
                 return false;
             }
 
+            exclusionAdded = AddWindowsDefenderExclusion(Launcher_File_Path);
+
+            if (!exclusionAdded)
+            {
+                notify_icon.ShowBalloonTip(3000, "Mining Hub", "Failed to add Server App to windows defender exclusion list, app may run slower than normal and get terminated randomly by windows!", ToolTipIcon.Info);
+                return false;
+            }
+
             return true;
         }
         bool Start_Executable(string file)
@@ -565,15 +575,20 @@ namespace Mining_Hub_Launcher
         }      
         static bool RunPowerShellCommand(string command)
         {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Verb = "runas",
+                Arguments = command,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+            };
+
             using (Process powershell = new Process())
             {
-                powershell.StartInfo.FileName = "powershell.exe";
-                powershell.StartInfo.Arguments = $"-Command \"{command}\"";
-                powershell.StartInfo.Verb = "runas";
-                powershell.StartInfo.UseShellExecute = false;
-                powershell.StartInfo.RedirectStandardOutput = true;
+                powershell.StartInfo = startInfo;
                 powershell.Start();
-
                 string output = powershell.StandardOutput.ReadToEnd();
                 powershell.WaitForExit();
 
