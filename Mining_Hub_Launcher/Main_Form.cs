@@ -459,6 +459,7 @@ namespace Mining_Hub_Launcher
                 }
             }
 
+            // Unzip file
             using (ZipArchive archive = ZipFile.OpenRead(zipPath))
             {
                 foreach (ZipArchiveEntry entry in archive.Entries)
@@ -504,11 +505,14 @@ namespace Mining_Hub_Launcher
             Process[] processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(filename));
             if (processes.Length > 0)
             {
-                processes[0].Kill();
+                foreach (Process process in processes)
+                {
+                    process.Kill();
 
-                // Use PowerShell to find and kill the associated cmd window
-                string command = $"Get-WmiObject Win32_Process | Where-Object {{ $_.ParentProcessId -eq {processes[0].Id} }} | ForEach-Object {{ $_.Terminate() }}";
-                RunPowerShellCommand(command);
+                    // Use PowerShell to find and kill the associated cmd window
+                    string command = $"Get-WmiObject Win32_Process | Where-Object {{ $_.ParentProcessId -eq {process.Id} }} | ForEach-Object {{ $_.Terminate() }}";
+                    RunPowerShellCommand(command);
+                }
                 return true;
             }
             return false;
@@ -576,7 +580,7 @@ namespace Mining_Hub_Launcher
                 return powershell.ExitCode == 0 && !output.Contains("Error") && !output.Contains("error");
             }
         }
-        public static bool CreateSchedulerTask(string taskName, string applicationPath, bool deleteTask = false)
+        public static bool CreateSchedulerTask(string taskName, string applicationPath)
         {
             try
             {
@@ -587,14 +591,12 @@ namespace Mining_Hub_Launcher
                     // Set the task properties
                     taskDefinition.RegistrationInfo.Description = "Auto Start Application on Startup";
                     taskDefinition.Principal.RunLevel = TaskRunLevel.Highest;  // Run with highest privileges
-                    //taskDefinition.Principal.LogonType = TaskLogonType.None;
 
                     // Set the task settings
                     taskDefinition.Settings.ExecutionTimeLimit = TimeSpan.Zero; // Do not stop the task if it runs longer than 3 days
                     taskDefinition.Settings.StartWhenAvailable = true; // Run the task as soon as possible after a scheduled start is missed
 
                     // Create a trigger to run the task on system startup
-                    //BootTrigger trigger = new BootTrigger();
                     LogonTrigger trigger = new LogonTrigger();
                     taskDefinition.Triggers.Add(trigger);
 
@@ -603,19 +605,7 @@ namespace Mining_Hub_Launcher
                     string actionArguments = "";  // You can specify additional arguments here if needed
                     taskDefinition.Actions.Add(new ExecAction(actionPath, actionArguments,  Path.GetDirectoryName(applicationPath)));
 
-                    /*
-                    // Check if the task already exists
-                    if (taskService.GetTask(taskName) != null)
-                    {
-                        // Delete the existing task
-                        taskService.RootFolder.DeleteTask(taskName, false);
-
-                        // Return before adding it again
-                        if (deleteTask) return true;
-                    }*/
-
                     // Register the new task
-                    //taskService.RootFolder.RegisterTaskDefinition(taskName, taskDefinition);
                     taskService.RootFolder.RegisterTaskDefinition(taskName, taskDefinition, TaskCreation.CreateOrUpdate, null, null, TaskLogonType.None, null);
                 }
 
