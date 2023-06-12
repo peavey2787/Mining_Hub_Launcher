@@ -163,7 +163,7 @@ namespace Mining_Hub_Launcher
             }
             else
             {
-                bool success = CreateSchedulerTask(name, fullPath, true);
+                bool success = CreateSchedulerTask(name, fullPath);
                 if (!success)
                 {
                     notify_icon.ShowBalloonTip(3000, "Mining Hub", "Unable to delete auto start from Windows task scheduler", ToolTipIcon.Info);
